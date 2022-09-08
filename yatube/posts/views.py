@@ -1,4 +1,3 @@
-from multiprocessing import context
 from django.shortcuts import render, get_object_or_404, redirect
 from .forms import CommentForm, PostForm
 from .models import Comment, Follow, Post, Group, User
@@ -160,7 +159,7 @@ def profile_follow(request, username):
 def profile_unfollow(request, username):
     # Дизлайк, отписка
     author = get_object_or_404(User, username=username)
-    to_delete = Follow.objects.get(author=author.id).delete()
+    Follow.objects.get(author=author.id).delete()
     return redirect('posts:profile', username)
     # if request.user != author:
     #    Follow.objects.delete(

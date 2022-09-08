@@ -74,6 +74,7 @@ class PostsUrlTests(TestCase):
 
     def test_urls_auth_correct_template(self):
         """URL-адрес использует соответствующий шаблон для auth-ed."""
+        random_name = 'Kendrick'
         templates_url_names = {
             '/': 'posts/index.html',
             f'/posts/{self.post.id}/edit/': 'posts/create_post.html',
@@ -81,7 +82,7 @@ class PostsUrlTests(TestCase):
             '/create/': 'posts/create_post.html',
             f'/group/{self.post.group.slug}/': 'posts/group_list.html',
             f'/posts/{self.post.id}/': 'posts/post_detail.html',
-            f'/kendrick/': 'core/404.html',
+            f'/{random_name}/': 'core/404.html',
         }
         for address, template in templates_url_names.items():
             with self.subTest(address=address):
