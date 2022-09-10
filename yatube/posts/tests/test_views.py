@@ -6,7 +6,6 @@ from django.core.cache import cache
 import tempfile
 import shutil
 from django.conf import settings
-from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 
