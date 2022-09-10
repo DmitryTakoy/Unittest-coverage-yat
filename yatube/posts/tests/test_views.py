@@ -1,10 +1,23 @@
 from django import forms
-from django.test import TestCase, Client
-from posts.models import Group, Post, User
+from django.test import TestCase, Client, override_settings
+from posts.models import Group, Post, User, Follow
 from django.urls import reverse
 from django.core.cache import cache
+import tempfile
+import shutil
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+
+
+def check_post_on_page(response):
+    return response.context['page_obj'][0]
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostsViewTest(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -75,7 +88,7 @@ class PostsViewTest(TestCase):
         response = self.authorized_client.get(
             reverse('posts:group_list',
                     kwargs={'slug': self.group.slug}))
-        first_object = response.context['page_obj'][0]
+        first_object = check_post_on_page(response)
         post_author_0 = first_object.author.username
         post_text_0 = first_object.text
         post_group_0 = first_object.group.slug
@@ -86,7 +99,7 @@ class PostsViewTest(TestCase):
     def test_index_page_shows_correct(self):
         """Проверяем index с правильным содержимым"""
         response = self.authorized_client.get(reverse('posts:index'))
-        first_object = response.context['page_obj'][0]
+        first_object = check_post_on_page(response)
         self.assertEqual(first_object.author.username, 'hasnoname')
         self.assertEqual(first_object.text, 'Тестовый пост')
         self.assertEqual(first_object.group.slug, 'pot')
@@ -106,9 +119,9 @@ class PostsViewTest(TestCase):
             reverse('posts:profile', kwargs={'username': self.user.username}))
         response_index = self.authorized_client.get(
             reverse('posts:index'))
-        group_object = response_group.context['page_obj'][0]
-        profile_object = response_profile.context['page_obj'][0]
-        index_object = response_index.context['page_obj'][0]
+        group_object = check_post_on_page(response_group)
+        profile_object = check_post_on_page(response_profile)
+        index_object = check_post_on_page(response_index)
         self.assertEqual(group_object.text, 'Тестовый пост')
         self.assertEqual(profile_object.text, 'Тестовый пост')
         self.assertEqual(index_object.text, 'Тестовый пост')
@@ -124,6 +137,9 @@ class PostsViewTest(TestCase):
         response = self.guest_client.get(
             reverse('posts:add_comment', kwargs={'post_id': 0}))
         self.assertEqual(response.status_code, 302)
+
+    def setUp(self) -> None:
+        cache.clear()
 
     def test_index_cache(self):
         """Проверяем работу кеширования."""
@@ -146,7 +162,6 @@ class PostsViewTest(TestCase):
             group=self.group,
             image=None,
         )
-        # Чистим кеш от предыдущих тестов
         cache.clear()
         # Запрашиваю текущий вид главной страницы
         response = self.authorized_client.get(reverse('posts:index'))
@@ -166,15 +181,37 @@ class PostsViewTest(TestCase):
         # Сравню кеш, в кот были удаленные посты и новый вид глав стр
         self.assertNotEqual(cache_mine, response_third.content)
 
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        self.small_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        self.uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=self.small_gif,
+            content_type='image/gif',
+        )
+
     def test_image_shown_index(self):
         """Проверяем вывод изображения на основной стр."""
         # Cоздаем посты
-        img = ('af.jpg')
+        # image = Image.new('RGB', (100, 100))
+        # image_file = tempfile.NamedTemporaryFile(suffix='.jpg')
+        # image.save(image_file)
+        # cons = ContentFile(image_file)
+        # con = BytesIO.getvalue(image_file)
+        con = self.uploaded
         test_post = Post.objects.create(
             author=self.user,
             text='FIRST_TeccccTb',
             group=self.group,
-            image=img,
+            image=con,
         )
         # Запрашиваю индекс
         response_index = self.authorized_client.get(reverse('posts:index'))
@@ -186,35 +223,18 @@ class PostsViewTest(TestCase):
             reverse('posts:post_detail', kwargs={'post_id': test_post.id})
         )
         # Вытягиваю поле image
-        first_object_on_index = response_index.context['page_obj'][0]
-        first_object_on_profile = response_profile.context['page_obj'][0]
-        first_object_on_group = response_group.context['page_obj'][0]
+        first_object_on_index = check_post_on_page(response_index)
+        first_object_on_profile = check_post_on_page(response_profile)
+        first_object_on_group = check_post_on_page(response_group)
         obj_on_pd = response_pd.context['post']
         post_image_i = first_object_on_index.image
         post_image_pro = first_object_on_profile.image
         post_image_g = first_object_on_group.image
         post_image_pd = obj_on_pd.image
-        self.assertEqual(post_image_i, img)
-        self.assertEqual(post_image_pro, img)
-        self.assertEqual(post_image_g, img)
-        self.assertEqual(post_image_pd, img)
-
-    def test_post_in_base(self):
-        """Проверяем создание записи в бд."""
-        img = ('af.jpg')
-        form_data = {
-            'text': 'testovy teeeekst',
-            'group': self.group.pk,
-            'img': img
-        }
-        self.authorized_client.post(
-            reverse('posts:post_create'),
-            data=form_data,
-            follow=True,
-        )
-        self.assertEqual(
-            form_data['text'], Post.objects.latest('pub_date').text
-        )
+        self.assertEqual(post_image_i, f'posts/{con.name}')
+        self.assertEqual(post_image_pro.name, f'posts/{con.name}')
+        self.assertEqual(post_image_g.name, f'posts/{con.name}')
+        self.assertEqual(post_image_pd.name, f'posts/{con.name}')
 
     def test_auth_follow_delete(self):
         """Новый сервис подписки работает."""
@@ -228,18 +248,19 @@ class PostsViewTest(TestCase):
             group=self.group,
             image=None,
         )
+        p = Follow.objects.create(
+            user=self.user,
+            author=test_user,
+        )
         # Subscribe
         cache.clear()
-        self.authorized_client.get(
-            reverse('posts:profile_follow',
-                    kwargs={'username': test_user.username}))
         # Get Page with Fav Authors
         response_follow = self.authorized_client.get(
             reverse('posts:follow_index'))
         response_follow_by_guest = self.guest_client.get(
             reverse('posts:follow_index'))
         # Check Follow_Page indicate post
-        objects_on_page = response_follow.context['page_obj'][0].text
+        objects_on_page = check_post_on_page(response_follow).text
         objects_on_page_cont = response_follow.context
         # Check Follow_Page does not for guest
         objects_on_page_sec = response_follow_by_guest.context
@@ -247,10 +268,34 @@ class PostsViewTest(TestCase):
         self.assertNotEqual(objects_on_page_sec, objects_on_page_cont)
         # Compare Follow_Page when sub-ed and when not
         cache.clear()
-        self.authorized_client.get(
-            reverse('posts:profile_unfollow',
-                    kwargs={'username': test_user.username}))
+        p.delete()
         response_follow_when_unfollowed = self.authorized_client.get(
             reverse('posts:follow_index'))
         objects_on_page_after_unsub = response_follow_when_unfollowed.context
         self.assertNotEqual(objects_on_page_after_unsub, objects_on_page_cont)
+
+    def test_follow_view_works(self):
+        """Подписка создает/удаляет запись в базе."""
+        test_user = User.objects.create(
+            username='Hasname',
+        )
+        # subscribe
+        self.authorized_client.get(
+            reverse('posts:profile_follow',
+                    kwargs={'username': test_user.username}))
+        # check if appear
+        checker = Follow.objects.filter(user=1, author=2).exists()
+        self.assertTrue(checker)
+        # unsub-be
+        self.authorized_client.get(
+            reverse('posts:profile_unfollow',
+                    kwargs={'username': test_user.username}))
+        # check if deleted
+        checker_sec = Follow.objects.filter(user=1, author=2).exists()
+        self.assertFalse(checker_sec)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        print(tempfile.mkdtemp)
+        shutil.rmtree(settings.MEDIA_ROOT)
+        return super().tearDownClass()

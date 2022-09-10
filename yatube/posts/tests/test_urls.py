@@ -1,5 +1,6 @@
 from posts.models import Post, Group, User
 from django.test import TestCase, Client
+from django.urls import reverse
 
 
 class PostsUrlTests(TestCase):
@@ -24,35 +25,71 @@ class PostsUrlTests(TestCase):
             group=cls.group,
         )
 
-    def test_index_page(self):
-        """Проверяем доступность index."""
-        response = self.guest_client.get('/')
-        self.assertEqual(response.status_code, 200)
+    def test_views_able_to_auth_ed(self):
+        """Проверяем: доступность privat страницы."""
+        templates = {
+            reverse(
+                'posts:index'): 200,
+            reverse(
+                'posts:profile',
+                kwargs={
+                    'username': self.post.author}): 200,
+            reverse(
+                'posts:post_create'): 200,
+            reverse(
+                'posts:group_list',
+                kwargs={
+                    'slug': self.post.group.slug}): 200,
+            reverse(
+                'posts:post_detail',
+                kwargs={
+                    'post_id': self.post.id}): 200,
+            reverse(
+                'posts:post_edit',
+                kwargs={
+                    'post_id': self.post.id}): 200,
+        }
+        for reverse_name, status_code in templates.items():
+            with self.subTest(reverse_name=reverse_name):
+                response = self.authorized_client.get(reverse_name)
+                self.assertEqual(response.status_code, status_code)
 
-    def test_post_detail(self):
-        """Проверяем доступность страницы поста."""
-        response = self.guest_client.get('/posts/1/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_detail_auth(self):
-        """Проверяем доступность страницы поста для auth."""
-        response = self.authorized_client.get('/posts/1/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_auth_login(self):
-        """Проверяем доступность логина."""
-        response = self.guest_client.get('/auth/login/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_auth_signup(self):
-        """Проверяем доступность регистрации."""
-        response = self.guest_client.get('/auth/signup/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_auth_signup(self):
-        """ регистрации."""
-        response = self.guest_client.get('/auth/signup/')
-        self.assertNotEqual(response.status_code, 302)
+    def test_views_able_to_guest(self):
+        """Проверяем: public страницы."""
+        templates = {
+            reverse(
+                'posts:index'): 200,
+            reverse(
+                'posts:profile',
+                kwargs={
+                    'username': self.post.author}): 200,
+            reverse(
+                'posts:post_create'): 302,
+            reverse(
+                'posts:group_list',
+                kwargs={
+                    'slug': self.post.group.slug}): 200,
+            reverse(
+                'posts:post_detail',
+                kwargs={
+                    'post_id': self.post.id}): 200,
+            reverse(
+                'posts:post_edit',
+                kwargs={
+                    'post_id': self.post.id}): 302,
+            reverse(
+                'posts:add_comment',
+                kwargs={
+                    'post_id': self.post.id}): 302,
+            reverse(
+                'users:login'): 200,
+            reverse(
+                'users:signup'): 200,
+        }
+        for reverse_name, status_code in templates.items():
+            with self.subTest(reverse_name=reverse_name):
+                response = self.guest_client.get(reverse_name)
+                self.assertEqual(response.status_code, status_code)
 
     def test_post_create(self):
         """Страница cоздания поста перенавправляет guest-пользователя."""
@@ -65,12 +102,6 @@ class PostsUrlTests(TestCase):
             f'/posts/{self.post.id}/edit/', follow=True)
         self.assertRedirects(
             response, f'/auth/login/?next=/posts/{self.post.id}/edit/')
-
-    def test_group_list(self):
-        """Проверяем доступность страницы с постами группы."""
-        response = self.authorized_client.get(
-            f'/group/{self.post.group.slug}/')
-        self.assertEqual(response.status_code, 200)
 
     def test_urls_auth_correct_template(self):
         """URL-адрес использует соответствующий шаблон для auth-ed."""

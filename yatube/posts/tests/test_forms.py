@@ -25,9 +25,9 @@ class PostFormTests(TestCase):
         )
         cls.form = PostForm()
 
-    @classmethod
-    def tearDownClass(cls) -> None:
-        return super().tearDownClass()
+    # @classmethod
+    # def tearDownClass(cls) -> None:
+    #    return super().tearDownClass()
 
     def test_text_label(self):
         """Проверка labels."""
@@ -47,23 +47,26 @@ class PostFormTests(TestCase):
         """Валидная форма создаёт запись в Post."""
         posts_count = Post.objects.count()
         one_more = 1
+        img = ('af.jpg')
         form_data = {
             'text': 'testovy teeeekst',
             'group': self.group.pk,
+            'img': img,
         }
         response = self.authorized_client.post(
             reverse('posts:post_create'),
             data=form_data,
             follow=True,
         )
+        post_text = Post.objects.latest('pub_date').text
+        post_group = Post.objects.latest('pub_date').group.pk
         self.assertRedirects(response,
                              reverse(
                                  'posts:profile', kwargs={
                                      'username': self.user.username}))
         self.assertEqual(Post.objects.count(), (posts_count + one_more))
-        self.assertEqual(
-            form_data['text'], Post.objects.latest('pub_date').text
-        )
+        self.assertEqual(form_data['text'], post_text)
+        self.assertEqual(form_data['group'], post_group)
 
     def test_edit_post(self):
         """Валидная форма меняет содержание поля text."""
@@ -76,20 +79,21 @@ class PostFormTests(TestCase):
             data=form_data,
             follow=True,
         )
+        post_text = Post.objects.latest('pub_date').text
+        post_group = Post.objects.latest('pub_date').group.pk
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(
             response,
             reverse('posts:post_detail',
                     kwargs={'post_id': self.post.id}))
         self.assertNotEqual(self.post.text, form_data['text'])
-        self.assertEqual(
-            form_data['text'], Post.objects.latest('pub_date').text)
+        self.assertEqual(form_data['text'], post_text)
+        self.assertEqual(form_data['group'], post_group)
 
     def test_comment_added_to_post_page(self):
         """Проверяем добавление комм. на пост и redirect."""
         form_data = {
             'text': 'testovy teeeekst',
-            # 'group': self.group.pk,
         }
         response = self.authorized_client.post(
             reverse('posts:add_comment', kwargs={'post_id': self.post.pk}),

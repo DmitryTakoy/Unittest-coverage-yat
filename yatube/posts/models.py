@@ -21,10 +21,6 @@ class Group(models.Model):
 class Post(CreatedModel):
     text = models.TextField(verbose_name='Текст',
                             help_text='Тееекст')
-    # pub_date = models.DateTimeField(auto_now_add=True,
-    #                                verbose_name='Дата публикации',
-    #                                help_text='Дата'
-    #                                )
     author = models.ForeignKey(User,
                                on_delete=models.CASCADE,
                                related_name='posts',

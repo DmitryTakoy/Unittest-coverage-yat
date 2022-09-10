@@ -76,7 +76,7 @@ def post_create(request):
         if form.is_valid():
             post = form.save(commit=False)
             post.author = request.user
-            form.save()  # post.save()
+            form.save()
             return redirect("posts:profile", request.user)
     form = PostForm(request.POST,
                     files=request.FILES,
@@ -98,10 +98,6 @@ def post_edit(request, post_id):
                     instance=post,
                     )
     if form.is_valid() and request.method == 'POST':
-        # form = PostForm(request.POST,
-        #                instance=post,
-        #                files=request.FILES or None,
-        #                )
         form.save()
         return redirect('posts:post_detail', post_id=post_id)
     context = {
@@ -126,7 +122,9 @@ def add_comment(request, post_id):
 @login_required
 def follow_index(request):
     template = 'posts/follow.html'
-    posts = Post.objects.filter(author__following__user=request.user)
+    posts = Post.objects.select_related(
+        'author').filter(
+            author__following__user=request.user)
     page_obj = my_paginator(request, posts)
     context = {
         'page_obj': page_obj,
@@ -136,34 +134,17 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    # Подписаться на автора
     author = get_object_or_404(User, username=username)
-    # follows = Follow.objects.filter(user=request.user)
     if request.user != author:
         Follow.objects.get_or_create(
             user=request.user,
             author=author,
         )
-        return redirect('posts:profile', username)
     return redirect('posts:profile', username)
-    # if author.not in follows:
-    #    following = True
-    #    context = {'following': following}
-    #    return context
-    # following = True
-    # context = {'following': following}
-    # return render(request, template)
 
 
 @login_required
 def profile_unfollow(request, username):
-    # Дизлайк, отписка
     author = get_object_or_404(User, username=username)
-    Follow.objects.get(author=author.id).delete()
+    Follow.objects.filter(author=author.id).delete()
     return redirect('posts:profile', username)
-    # if request.user != author:
-    #    Follow.objects.delete(
-    #        user = request.user,
-    #        author = author,
-    #    )
-    # return redirect('posts:profile', username)
