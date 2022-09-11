@@ -1,4 +1,3 @@
-from calendar import c
 from django import forms
 from django.test import TestCase, Client, override_settings
 from posts.models import Group, Post, User, Follow
@@ -270,7 +269,7 @@ class PostsViewTest(TestCase):
             group=self.group,
             image=None,
         )
-        p = Follow.objects.create(
+        Follow.objects.create(
             user=self.user,
             author=test_user,
         )
@@ -291,7 +290,7 @@ class PostsViewTest(TestCase):
         response_follow = self.authorized_client.get(
             reverse('posts:follow_index'))
         object_on_page = self.check_post_on_page(response_follow)
-        self.assertFalse(object_on_page, 'Нет постов на странице')
+        self.assertFalse(object_on_page, 'На странице есть пост')
 
     @classmethod
     def tearDownClass(cls) -> None:
