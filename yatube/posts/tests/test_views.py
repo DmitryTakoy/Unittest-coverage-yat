@@ -16,6 +16,15 @@ def check_post_on_page(response):
     return response.context['page_obj'][0]
 
 
+def asserts_check_post(self, obj):
+    check_author = obj.author.username
+    check_text = obj.text
+    check_group = obj.group.slug
+    self.assertEqual(check_author, 'hasnoname')
+    self.assertEqual(check_text, 'Тестовый пост')
+    self.assertEqual(check_group, 'pot')
+
+
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostsViewTest(TestCase):
     @classmethod
@@ -88,20 +97,13 @@ class PostsViewTest(TestCase):
             reverse('posts:group_list',
                     kwargs={'slug': self.group.slug}))
         first_object = check_post_on_page(response)
-        post_author_0 = first_object.author.username
-        post_text_0 = first_object.text
-        post_group_0 = first_object.group.slug
-        self.assertEqual(post_author_0, 'hasnoname')
-        self.assertEqual(post_text_0, 'Тестовый пост')
-        self.assertEqual(post_group_0, 'pot')
+        asserts_check_post(self, first_object)
 
     def test_index_page_shows_correct(self):
         """Проверяем index с правильным содержимым"""
         response = self.authorized_client.get(reverse('posts:index'))
         first_object = check_post_on_page(response)
-        self.assertEqual(first_object.author.username, 'hasnoname')
-        self.assertEqual(first_object.text, 'Тестовый пост')
-        self.assertEqual(first_object.group.slug, 'pot')
+        asserts_check_post(self, first_object)
 
     def test_post_by_user_id_page_shows_correct(self):
         """Проверяем profile с правильным контекстом"""
@@ -121,9 +123,9 @@ class PostsViewTest(TestCase):
         group_object = check_post_on_page(response_group)
         profile_object = check_post_on_page(response_profile)
         index_object = check_post_on_page(response_index)
-        self.assertEqual(group_object.text, 'Тестовый пост')
-        self.assertEqual(profile_object.text, 'Тестовый пост')
-        self.assertEqual(index_object.text, 'Тестовый пост')
+        asserts_check_post(self, group_object)
+        asserts_check_post(self, profile_object)
+        asserts_check_post(self, index_object)
 
     def test_created_post_not_added_to_other_group_page(self):
         """Проверяем: пост не отражается на странице другой группы."""
@@ -200,11 +202,6 @@ class PostsViewTest(TestCase):
     def test_image_shown_index(self):
         """Проверяем вывод изображения на основной стр."""
         # Cоздаем посты
-        # image = Image.new('RGB', (100, 100))
-        # image_file = tempfile.NamedTemporaryFile(suffix='.jpg')
-        # image.save(image_file)
-        # cons = ContentFile(image_file)
-        # con = BytesIO.getvalue(image_file)
         con = self.uploaded
         test_post = Post.objects.create(
             author=self.user,

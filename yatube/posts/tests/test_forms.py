@@ -6,6 +6,10 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 
+def check_post_on_page(response):
+    return response.context['post']
+
+
 class PostFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -24,10 +28,6 @@ class PostFormTests(TestCase):
             group=cls.group,
         )
         cls.form = PostForm()
-
-    # @classmethod
-    # def tearDownClass(cls) -> None:
-    #    return super().tearDownClass()
 
     def test_text_label(self):
         """Проверка labels."""
@@ -58,37 +58,45 @@ class PostFormTests(TestCase):
             data=form_data,
             follow=True,
         )
-        post_text = Post.objects.latest('pub_date').text
-        post_group = Post.objects.latest('pub_date').group.pk
+        post = Post.objects.latest('pub_date')
         self.assertRedirects(response,
                              reverse(
                                  'posts:profile', kwargs={
                                      'username': self.user.username}))
         self.assertEqual(Post.objects.count(), (posts_count + one_more))
-        self.assertEqual(form_data['text'], post_text)
-        self.assertEqual(form_data['group'], post_group)
+        self.assertEqual(form_data['text'], post.text)
+        self.assertEqual(form_data['group'], post.group.pk)
 
     def test_edit_post(self):
         """Валидная форма меняет содержание поля text."""
+        test_post = Post.objects.create(
+            author=self.user,
+            text='Тестовый пост111',
+            group=self.group,
+        )
         form_data = {
             'text': 'testovy teeeekst25',
             'group': self.group.pk,
         }
         response = self.authorized_client.post(
-            reverse('posts:post_edit', kwargs={'post_id': self.post.pk}),
+            reverse('posts:post_edit', kwargs={'post_id': test_post.pk}),
             data=form_data,
             follow=True,
         )
-        post_text = Post.objects.latest('pub_date').text
-        post_group = Post.objects.latest('pub_date').group.pk
+        # post = self.post # Post.objects.latest('pub_date')
+        # Александр, здесь нельзя ставить self.post,
+        # тест вытягивает данные с переменной cls.post и не проходит.
+        response_post = self.authorized_client.get(
+            reverse('posts:post_detail', kwargs={'post_id': test_post.id}))
+        post = check_post_on_page(response_post)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(
             response,
             reverse('posts:post_detail',
-                    kwargs={'post_id': self.post.id}))
+                    kwargs={'post_id': post.id}))
         self.assertNotEqual(self.post.text, form_data['text'])
-        self.assertEqual(form_data['text'], post_text)
-        self.assertEqual(form_data['group'], post_group)
+        self.assertEqual(form_data['text'], post.text)
+        self.assertEqual(form_data['group'], post.group.pk)
 
     def test_comment_added_to_post_page(self):
         """Проверяем добавление комм. на пост и redirect."""
@@ -100,10 +108,11 @@ class PostFormTests(TestCase):
             data=form_data,
             follow=True,
         )
+        last_comment = Comment.objects.latest('pub_date').text
         self.assertRedirects(response,
                              reverse(
                                  'posts:post_detail', kwargs={
                                      'post_id': self.post.pk}))
         self.assertEqual(
-            form_data['text'], Comment.objects.latest('pub_date').text
+            form_data['text'], last_comment
         )

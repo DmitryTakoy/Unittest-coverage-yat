@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from posts.models import Post, Group, User
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -29,25 +30,31 @@ class PostsUrlTests(TestCase):
         """Проверяем: доступность privat страницы."""
         templates = {
             reverse(
-                'posts:index'): 200,
+                'posts:index'): HTTPStatus.OK,
             reverse(
                 'posts:profile',
                 kwargs={
-                    'username': self.post.author}): 200,
+                    'username': self.post.author}): HTTPStatus.OK,
             reverse(
-                'posts:post_create'): 200,
+                'posts:post_create'): HTTPStatus.OK,
             reverse(
                 'posts:group_list',
                 kwargs={
-                    'slug': self.post.group.slug}): 200,
+                    'slug': self.post.group.slug}): HTTPStatus.OK,
             reverse(
                 'posts:post_detail',
                 kwargs={
-                    'post_id': self.post.id}): 200,
+                    'post_id': self.post.id}): HTTPStatus.OK,
             reverse(
                 'posts:post_edit',
                 kwargs={
-                    'post_id': self.post.id}): 200,
+                    'post_id': self.post.id}): HTTPStatus.OK,
+            reverse(
+                'posts:add_comment',
+                kwargs={
+                    'post_id': self.post.id}): HTTPStatus.FOUND,
+            reverse(
+                'users:logout'): HTTPStatus.OK,
         }
         for reverse_name, status_code in templates.items():
             with self.subTest(reverse_name=reverse_name):
@@ -58,37 +65,39 @@ class PostsUrlTests(TestCase):
         """Проверяем: public страницы."""
         templates = {
             reverse(
-                'posts:index'): 200,
+                'posts:index'): HTTPStatus.OK,
             reverse(
                 'posts:profile',
                 kwargs={
-                    'username': self.post.author}): 200,
+                    'username': self.post.author}): HTTPStatus.OK,
             reverse(
-                'posts:post_create'): 302,
+                'posts:post_create'): HTTPStatus.FOUND,
             reverse(
                 'posts:group_list',
                 kwargs={
-                    'slug': self.post.group.slug}): 200,
+                    'slug': self.post.group.slug}): HTTPStatus.OK,
             reverse(
                 'posts:post_detail',
                 kwargs={
-                    'post_id': self.post.id}): 200,
+                    'post_id': self.post.id}): HTTPStatus.OK,
             reverse(
                 'posts:post_edit',
                 kwargs={
-                    'post_id': self.post.id}): 302,
+                    'post_id': self.post.id}): HTTPStatus.FOUND,
             reverse(
                 'posts:add_comment',
                 kwargs={
-                    'post_id': self.post.id}): 302,
+                    'post_id': self.post.id}): HTTPStatus.FOUND,
             reverse(
-                'users:login'): 200,
+                'users:login'): HTTPStatus.OK,
             reverse(
-                'users:signup'): 200,
+                'users:signup'): HTTPStatus.OK,
         }
         for reverse_name, status_code in templates.items():
             with self.subTest(reverse_name=reverse_name):
                 response = self.guest_client.get(reverse_name)
+                # Александр проверка для авторизованого
+                # пользователя выше, тоже сабтестом.
                 self.assertEqual(response.status_code, status_code)
 
     def test_post_create(self):
