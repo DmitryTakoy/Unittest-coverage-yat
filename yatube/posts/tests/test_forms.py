@@ -6,10 +6,6 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 
-def check_post_on_page(response):
-    return response.context['post']
-
-
 class PostFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -28,6 +24,9 @@ class PostFormTests(TestCase):
             group=cls.group,
         )
         cls.form = PostForm()
+
+    def check_post_on_page(self, response):
+        return response.context['post']
 
     def test_text_label(self):
         """Проверка labels."""
@@ -83,20 +82,23 @@ class PostFormTests(TestCase):
             data=form_data,
             follow=True,
         )
-        # post = self.post # Post.objects.latest('pub_date')
-        # Александр, здесь нельзя ставить self.post,
-        # тест вытягивает данные с переменной cls.post и не проходит.
+        # post = self.post
+        # post = PostFormTests.post
+        # Не будет так работать. Проверьте, пожалуйста.
+        # Посмотрел треды в канале проджект. Есть задача проверить, что
+        # измененый и исходный посты это один и тот же пост.
+        # Эта проверка есть ниже в response_post.
         response_post = self.authorized_client.get(
-            reverse('posts:post_detail', kwargs={'post_id': test_post.id}))
-        post = check_post_on_page(response_post)
+            reverse('posts:post_detail', kwargs={'post_id': test_post.pk}))
+        obj_on_page = self.check_post_on_page(response_post)
+        self.assertEqual(form_data['text'], obj_on_page.text)
+        self.assertEqual(form_data['group'], obj_on_page.group.pk)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(
             response,
             reverse('posts:post_detail',
-                    kwargs={'post_id': post.id}))
-        self.assertNotEqual(self.post.text, form_data['text'])
-        self.assertEqual(form_data['text'], post.text)
-        self.assertEqual(form_data['group'], post.group.pk)
+                    kwargs={'post_id': test_post.id}))
+        self.assertNotEqual(test_post.text, form_data['text'])
 
     def test_comment_added_to_post_page(self):
         """Проверяем добавление комм. на пост и redirect."""

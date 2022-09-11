@@ -1,3 +1,4 @@
+from calendar import c
 from django import forms
 from django.test import TestCase, Client, override_settings
 from posts.models import Group, Post, User, Follow
@@ -10,19 +11,6 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
-
-
-def check_post_on_page(response):
-    return response.context['page_obj'][0]
-
-
-def asserts_check_post(self, obj):
-    check_author = obj.author.username
-    check_text = obj.text
-    check_group = obj.group.slug
-    self.assertEqual(check_author, 'hasnoname')
-    self.assertEqual(check_text, 'Тестовый пост')
-    self.assertEqual(check_group, 'pot')
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
@@ -48,6 +36,45 @@ class PostsViewTest(TestCase):
             title='kot',
             slug='kot',
             description='kotik',
+        )
+
+    def check_post_on_page(self, response):
+        try:
+            x = response.context['page_obj'][0]
+            return x
+        except BaseException:
+            i = False
+            return i
+
+    def creating_test_user(self):
+        test_user = User.objects.create(
+            username='Hasname',
+        )
+        return test_user
+
+    def asserts_check_post(self, clas, obj):
+        check_author = obj.author.username
+        check_text = obj.text
+        check_group = obj.group.slug
+        self.assertEqual(check_author, 'hasnoname')
+        self.assertEqual(check_text, 'Тестовый пост')
+        self.assertEqual(check_group, 'pot')
+
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        self.small_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        self.uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=self.small_gif,
+            content_type='image/gif',
         )
 
     def test_views_get_right_pages(self):
@@ -96,14 +123,14 @@ class PostsViewTest(TestCase):
         response = self.authorized_client.get(
             reverse('posts:group_list',
                     kwargs={'slug': self.group.slug}))
-        first_object = check_post_on_page(response)
-        asserts_check_post(self, first_object)
+        first_object = self.check_post_on_page(response)
+        self.asserts_check_post(self, first_object)
 
     def test_index_page_shows_correct(self):
         """Проверяем index с правильным содержимым"""
         response = self.authorized_client.get(reverse('posts:index'))
-        first_object = check_post_on_page(response)
-        asserts_check_post(self, first_object)
+        first_object = self.check_post_on_page(response)
+        self.asserts_check_post(self, first_object)
 
     def test_post_by_user_id_page_shows_correct(self):
         """Проверяем profile с правильным контекстом"""
@@ -120,12 +147,12 @@ class PostsViewTest(TestCase):
             reverse('posts:profile', kwargs={'username': self.user.username}))
         response_index = self.authorized_client.get(
             reverse('posts:index'))
-        group_object = check_post_on_page(response_group)
-        profile_object = check_post_on_page(response_profile)
-        index_object = check_post_on_page(response_index)
-        asserts_check_post(self, group_object)
-        asserts_check_post(self, profile_object)
-        asserts_check_post(self, index_object)
+        group_object = self.check_post_on_page(response_group)
+        profile_object = self.check_post_on_page(response_profile)
+        index_object = self.check_post_on_page(response_index)
+        self.asserts_check_post(self, group_object)
+        self.asserts_check_post(self, profile_object)
+        self.asserts_check_post(self, index_object)
 
     def test_created_post_not_added_to_other_group_page(self):
         """Проверяем: пост не отражается на странице другой группы."""
@@ -138,9 +165,6 @@ class PostsViewTest(TestCase):
         response = self.guest_client.get(
             reverse('posts:add_comment', kwargs={'post_id': 0}))
         self.assertEqual(response.status_code, 302)
-
-    def setUp(self) -> None:
-        cache.clear()
 
     def test_index_cache(self):
         """Проверяем работу кеширования."""
@@ -182,23 +206,6 @@ class PostsViewTest(TestCase):
         # Сравню кеш, в кот были удаленные посты и новый вид глав стр
         self.assertNotEqual(cache_mine, response_third.content)
 
-    def setUp(self):
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.user)
-        self.small_gif = (
-            b'\x47\x49\x46\x38\x39\x61\x02\x00'
-            b'\x01\x00\x80\x00\x00\x00\x00\x00'
-            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
-            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
-            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-            b'\x0A\x00\x3B'
-        )
-        self.uploaded = SimpleUploadedFile(
-            name='small.gif',
-            content=self.small_gif,
-            content_type='image/gif',
-        )
-
     def test_image_shown_index(self):
         """Проверяем вывод изображения на основной стр."""
         # Cоздаем посты
@@ -219,9 +226,9 @@ class PostsViewTest(TestCase):
             reverse('posts:post_detail', kwargs={'post_id': test_post.id})
         )
         # Вытягиваю поле image
-        first_object_on_index = check_post_on_page(response_index)
-        first_object_on_profile = check_post_on_page(response_profile)
-        first_object_on_group = check_post_on_page(response_group)
+        first_object_on_index = self.check_post_on_page(response_index)
+        first_object_on_profile = self.check_post_on_page(response_profile)
+        first_object_on_group = self.check_post_on_page(response_group)
         obj_on_pd = response_pd.context['post']
         post_image_i = first_object_on_index.image
         post_image_pro = first_object_on_profile.image
@@ -232,12 +239,31 @@ class PostsViewTest(TestCase):
         self.assertEqual(post_image_g.name, f'posts/{con.name}')
         self.assertEqual(post_image_pd.name, f'posts/{con.name}')
 
-    def test_auth_follow_delete(self):
-        """Новый сервис подписки работает."""
-        # Create User
-        test_user = User.objects.create(
-            username='Hasname',
+    def test_view_follow_works(self):
+        """Проверяем подписка создает запись в базе."""
+        test_user = self.creating_test_user()
+        self.authorized_client.get(
+            reverse('posts:profile_follow',
+                    kwargs={'username': test_user.username}))
+        checker = Follow.objects.filter(user=1, author=2).exists()
+        self.assertTrue(checker)
+
+    def test_view_unfollow_works(self):
+        """Проверяем отписка удаляет запись в базе."""
+        test_user = self.creating_test_user()
+        Follow.objects.create(
+            user=self.user,
+            author=test_user,
         )
+        self.authorized_client.get(
+            reverse('posts:profile_unfollow',
+                    kwargs={'username': test_user.username}))
+        checker = Follow.objects.filter(user=1, author=2).exists()
+        self.assertFalse(checker)
+
+    def test_post_appear(self):
+        """Проверяем пост появляется в ленте."""
+        test_user = self.creating_test_user()
         test_post = Post.objects.create(
             author=test_user,
             text='new services check',
@@ -248,47 +274,24 @@ class PostsViewTest(TestCase):
             user=self.user,
             author=test_user,
         )
-        # Subscribe
-        cache.clear()
-        # Get Page with Fav Authors
         response_follow = self.authorized_client.get(
             reverse('posts:follow_index'))
-        response_follow_by_guest = self.guest_client.get(
-            reverse('posts:follow_index'))
-        # Check Follow_Page indicate post
-        objects_on_page = check_post_on_page(response_follow).text
-        objects_on_page_cont = response_follow.context
-        # Check Follow_Page does not for guest
-        objects_on_page_sec = response_follow_by_guest.context
-        self.assertEqual(test_post.text, objects_on_page)
-        self.assertNotEqual(objects_on_page_sec, objects_on_page_cont)
-        # Compare Follow_Page when sub-ed and when not
-        cache.clear()
-        p.delete()
-        response_follow_when_unfollowed = self.authorized_client.get(
-            reverse('posts:follow_index'))
-        objects_on_page_after_unsub = response_follow_when_unfollowed.context
-        self.assertNotEqual(objects_on_page_after_unsub, objects_on_page_cont)
+        object_on_page = self.check_post_on_page(response_follow)
+        self.assertEqual(test_post.text, object_on_page.text)
 
-    def test_follow_view_works(self):
-        """Подписка создает/удаляет запись в базе."""
-        test_user = User.objects.create(
-            username='Hasname',
+    def test_post_appear(self):
+        """Проверяем пост не отражается в ленте."""
+        test_user = self.creating_test_user()
+        Post.objects.create(
+            author=test_user,
+            text='new services check',
+            group=self.group,
+            image=None,
         )
-        # subscribe
-        self.authorized_client.get(
-            reverse('posts:profile_follow',
-                    kwargs={'username': test_user.username}))
-        # check if appear
-        checker = Follow.objects.filter(user=1, author=2).exists()
-        self.assertTrue(checker)
-        # unsub-be
-        self.authorized_client.get(
-            reverse('posts:profile_unfollow',
-                    kwargs={'username': test_user.username}))
-        # check if deleted
-        checker_sec = Follow.objects.filter(user=1, author=2).exists()
-        self.assertFalse(checker_sec)
+        response_follow = self.authorized_client.get(
+            reverse('posts:follow_index'))
+        object_on_page = self.check_post_on_page(response_follow)
+        self.assertFalse(object_on_page, 'Нет постов на странице')
 
     @classmethod
     def tearDownClass(cls) -> None:

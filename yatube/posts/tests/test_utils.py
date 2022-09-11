@@ -31,7 +31,7 @@ class PostsViewTest(TestCase):
             Post(
                 author=cls.user,
                 text=f"Тесты_{i}",
-                group=cls.group) for i in range(13)]
+                group=cls.group) for i in range(Quant_OF_POST)]
         Post.objects.bulk_create(objs=obj, batch_size=Quant_OF_POST)
 
     def test_first_page_paginator(self):
